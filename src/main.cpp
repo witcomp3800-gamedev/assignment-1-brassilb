@@ -2,6 +2,7 @@
 #include <imgui/imgui.h>
 #include <imgui/rlImGui.h>
 #include <imgui/imgui_stdlib.h>
+#include <algorithm>
 #include <cstddef>
 #include <filesystem>
 #include <fstream>
@@ -173,7 +174,7 @@ namespace a1 {
 		std::string name;
 		Position position;
 		Velocity velocity;
-		std::unique_ptr<Shape> shape;
+		std::shared_ptr<Shape> shape;
 		float scale;
 		Color color;
 		bool is_active;
@@ -244,6 +245,8 @@ int main(void) {
 	//--------------------------------------------------------------------------------------
 	const auto input_path = std::filesystem::path{ "assets/input.txt" };
 	const auto [window, font_asset, entity_templates] = a1::load_config(input_path);
+	auto entities = std::vector<a1::Entity>{ entity_templates.size() };
+	std::copy(entity_templates.begin(), entity_templates.end(), std::back_inserter(entities));
 
 	SetConfigFlags(FLAG_WINDOW_HIGHDPI);
 	InitWindow(window.width, window.height, window.caption.c_str());
@@ -421,7 +424,7 @@ namespace a1 {
 	std::istream& read_circle_entity(std::istream& input, Entity& entity) {
 		float radius;
 		if( read_common_components(input, entity) && input >> radius ) {
-			entity.shape = std::make_unique<Circle>(radius);
+			entity.shape = std::make_shared<Circle>(radius);
 		}
 		return input;
 	}
@@ -441,7 +444,7 @@ namespace a1 {
 		float width;
 		float height;
 		if( read_common_components(input, entity) && input >> width >> height ) {
-			entity.shape = std::make_unique<Rectangle>(width, height);
+			entity.shape = std::make_shared<Rectangle>(width, height);
 		}
 		return input;
 	}
