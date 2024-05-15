@@ -195,30 +195,43 @@ namespace a1 {
 	 *     - Font [File] [Size] [Red] [Green] [Blue]
 	 *     - Rectangle [Name] [X] [Y] [X Velocity] [Y Velocity] [Red] [Green] [Blue] [Width] [Height]
 	 *     - Circle [Name] [X] [Y] [X Velocity] [Y Velocity] [Red] [Green] [Blue] [Radius]
-	 * @param input Input file stream
+	 * @param input Input stream
 	 * @param obj Game config
+	 * @return Input stream (for chaining)
 	 */
 	std::istream& operator >>(std::istream& input, Config& obj);
 
 	/**
+	 * Loads game configuration from the specified file path.
+	 * @param path Input file path
+	 * @throws std::runtime_error if file not read
+	 * @return Input stream (for chaining)
+* 
+	 */
+	Config load_config(const std::filesystem::path& path);
+
+	/**
 	 * Reads an entity with a circle from an input stream.
-	 * @param input Input file stream
+	 * @param input Input stream
 	 * @param obj Game entity
+	 * @return Input stream (for chaining)
 	 */
 	std::istream& read_circle_entity(std::istream& input, Entity& obj);
 
 
 	/**
 	 * Reads an entity's common components (i.e. not the shape) from an input stream.
-	 * @param input Input file stream
+	 * @param input Input stream
 	 * @param obj Game entity
+	 * @return Input stream (for chaining)
 	 */
 	std::istream& read_common_components(std::istream& input, Entity& obj);
 
 	/**
 	 * Reads an entity with a rectangle from an input stream.
-	 * @param input Input file stream
+	 * @param input Input stream
 	 * @param obj Game entity
+	 * @return Input stream (for chaining)
 	 */
 	std::istream& read_rectangle_entity(std::istream& input, Entity& obj);
 }
@@ -230,23 +243,7 @@ int main(void) {
 	// Initialization
 	//--------------------------------------------------------------------------------------
 	const auto input_path = std::filesystem::path{ "assets/input.txt" };
-	auto input_file = std::ifstream{ input_path };
-	a1::Config config;
-	input_file >> config;
-	if( !input_file && !input_file.eof() ) {
-		std::cerr << "Failed to load config from path " << input_path << ". Exiting...\n";
-		return -1;
-	}
-	auto& [window, font_asset, entity_templates] = config;
-
-	// Test if entity shapes were read correctly
-	std::cout << "Read " << entity_templates.size() << (entity_templates.size() == 1 ? " entity" : " entities.") << "\n";
-	std::size_t i = 0;
-	for( const auto& e : entity_templates ) {
-		const bool is_circle = dynamic_cast<a1::Circle*>(e.shape.get());
-		const bool is_rectangle = dynamic_cast<a1::Rectangle*>(e.shape.get());
-		std::cout << i++ << ": " << (is_circle ? "circle" : is_rectangle ? "rectangle" : "error") << "\n";
-	}
+	const auto [window, font_asset, entity_templates] = a1::load_config(input_path);
 
 	SetConfigFlags(FLAG_WINDOW_HIGHDPI);
 	InitWindow(window.width, window.height, window.caption.c_str());
@@ -383,14 +380,12 @@ namespace a1 {
 		std::string s;
 		while( input >> s ) {
 			if( s == "Window" ) {
-				std::cout << "Reading window...\n";
 				input
 					>> obj.window.caption
 					>> obj.window.width
 					>> obj.window.height;
 			}
 			else if( s == "Font" ) {
-				std::cout << "Reading font...\n";
 				input
 					>> obj.font_asset.file
 					>> obj.font_asset.size
@@ -398,14 +393,12 @@ namespace a1 {
 				obj.font_asset.color.a = 255;
 			}
 			else if( s == "Circle" ) {
-				std::cout << "Reading circle...\n";
 				Entity circle_entity;
 				if( read_circle_entity(input, circle_entity) ) {
 					obj.entity_templates.push_back(std::move(circle_entity));
 				}
 			}
 			else if( s == "Rectangle" ) {
-				std::cout << "Reading rectangle...\n";
 				Entity rectangle_entity;
 				if( read_rectangle_entity(input, rectangle_entity) ) {
 					obj.entity_templates.push_back(std::move(rectangle_entity));
@@ -413,6 +406,16 @@ namespace a1 {
 			}
 		}
 		return input;
+	}
+
+	Config load_config(const std::filesystem::path& path) {
+		auto input_file = std::ifstream{ path };
+		a1::Config config;
+		input_file >> config;
+		if( !input_file && !input_file.eof() ) {
+			throw std::runtime_error("Failed to read configuration file.");
+		}
+		return config;
 	}
 
 	std::istream& read_circle_entity(std::istream& input, Entity& entity) {
