@@ -21,13 +21,13 @@ namespace a1 {
 	};
 
 	/**
-	 * 32-bit RGBA color.
+	 * Floating point RGBA color.
 	 */
 	struct Color {
-		std::uint8_t r = 0;
-		std::uint8_t g = 0;
-		std::uint8_t b = 0;
-		std::uint8_t a = 0;
+		float r = 0.0f;
+		float g = 0.0f;
+		float b = 0.0f;
+		float a = 0.0f;
 
 		/**
 		 * Creates a default transparent color.
@@ -36,12 +36,12 @@ namespace a1 {
 
 		/*
 		 * Creates the specified color.
-		 * @param r Red channel [0, 255]
-		 * @param g Green channel [0, 255]
-		 * @param b Blue channel [0, 255]
-		 * @param a Alpha channel [0, 255], default 255 (opaque)
+		 * @param r Red channel [0, 1]
+		 * @param g Green channel [0, 1]
+		 * @param b Blue channel [0, 1]
+		 * @param a Alpha channel [0, 1], default 1 (opaque)
 		 */
-		Color(std::uint8_t r, std::uint8_t g, std::uint8_t b, std::uint8_t a = 255) : r(r), g(g), b(b), a(a) {}
+		Color(float r, float g, float b, float a = 1.0f) : r(r), g(g), b(b), a(a) {}
 	};
 
 	/**
@@ -50,7 +50,7 @@ namespace a1 {
 	struct FontAsset {
 		std::filesystem::path file;
 		int size = 12;
-		Color color ={ 255, 255, 255, 255 };
+		Color color ={ 1.0f, 1.0f, 1.0f, 1.0f };
 	};
 
 	/**
@@ -203,6 +203,15 @@ namespace a1 {
 	std::istream& operator >>(std::istream& input, Config& obj);
 
 	/**
+	 * Draws an entity's name to the screen with raylib.
+	 * @param entity Entity object to draw
+	 * @param font raylib font data
+	 * @param size Text font size
+	 * @param color Text color
+	 */
+	void draw_name(const Entity& entity, const Font& font, int size, Color color);
+
+	/**
 	 * Draws an entity's shape to the screen with raylib.
 	 * @param entity Entity object to draw
 	 */
@@ -269,6 +278,8 @@ int main(void) {
 	// General variables
 	//--------------------------------------------------------------------------------------
 	bool draw_shapes_enabled = true;
+	bool draw_names_enabled = true;
+	const auto font = LoadFont(font_asset.file.string().c_str());
 
 	//shape properties to draw on the screen (circle for this example)
 	//units of size and speed are in pixels
@@ -280,12 +291,8 @@ int main(void) {
 	float color[3] ={ 0.0f,0.0,1.0f }; //color is from 0-1
 
 	//Let's draw some text to the screen too
-	bool drawText=true;
 	std::string strText= "Some Text";
 	std::string newText= strText;
-
-	//load a font (Raylib gives warning if font can't be found, then uses default as fallback)
-	Font font = LoadFont(font_asset.file.string().c_str());
 
 	// Main game loop
 	//--------------------------------------------------------------------------------------
@@ -313,16 +320,9 @@ int main(void) {
 			if( draw_shapes_enabled ) {
 				draw_shape(entity);
 			}
-		}
-
-		if( drawText ) {
-			//get the size (x and y) of the text object
-			//(font,c string, font size, font spaceing)
-			Vector2 textSize= MeasureTextEx(font, strText.c_str(), font_asset.size, 1);
-
-			//draw the text (using the text size to help draw it in the corner
-			//(font,c string, vector2, font size, font spaceing, color)
-			DrawTextEx(font, strText.c_str(), { 0.0f, window.height - textSize.y }, font_asset.size, 1, WHITE);
+			if( draw_names_enabled ) {
+				draw_name(entity, font, font_asset.size, font_asset.color);
+			}
 		}
 
 		//********** ImGUI Content *********
@@ -339,7 +339,7 @@ int main(void) {
 		//checkboxes, they directly modify the value (which is why we send a reference)
 		ImGui::Checkbox("Draw Cricle", &draw_shapes_enabled);
 		ImGui::SameLine();
-		ImGui::Checkbox("Draw Text", &drawText);
+		ImGui::Checkbox("Draw Text", &draw_names_enabled);
 
 		//slider, again directly modifies the value and limites between 0 and 300 for this example
 		ImGui::SliderFloat("Radius", &circRadius, 0.0f, 300.0f);
@@ -394,7 +394,7 @@ namespace a1 {
 			static_cast<int>(position.x),
 			static_cast<int>(position.y),
 			radius * scale,
-			{ color.r, color.g, color.b, color.a }
+			ColorFromNormalized({ color.r, color.g, color.b, color.a })
 		);
 	}
 
@@ -404,7 +404,7 @@ namespace a1 {
 			static_cast<int>(position.y - height / 2),
 			static_cast<int>(width),
 			static_cast<int>(height),
-			{ color.r, color.g, color.b, color.a }
+			ColorFromNormalized({ color.r, color.g, color.b, color.a })
 		);
 	}
 
@@ -422,7 +422,7 @@ namespace a1 {
 					>> obj.font_asset.file
 					>> obj.font_asset.size
 					>> obj.font_asset.color.r >> obj.font_asset.color.g >> obj.font_asset.color.b;
-				obj.font_asset.color.a = 255;
+				obj.font_asset.color.a = 1.0f;
 			}
 			else if( s == "Circle" ) {
 				Entity circle_entity;
@@ -438,6 +438,20 @@ namespace a1 {
 			}
 		}
 		return input;
+	}
+
+	void draw_name(const Entity& entity, const Font& font, int size, Color color) {
+		const auto text_size = MeasureTextEx(font, entity.name.c_str(), size, 1.0f);
+		DrawTextEx(
+			font,
+			entity.name.c_str(),
+			{ entity.position.x - text_size.x / 2, entity.position.y - text_size.y / 2 },
+			size,
+			1.0f,
+			ColorFromNormalized({ color.r, color.g, color.b, color.a })
+		);
+
+		
 	}
 
 	void draw_shape(const Entity& entity) {
@@ -463,16 +477,12 @@ namespace a1 {
 	}
 
 	std::istream& read_common_components(std::istream& input, Entity& entity) {
-		float r, g, b;
 		input
 			>> entity.name
 			>> entity.position.x >> entity.position.y
 			>> entity.velocity.x >> entity.velocity.y
-			>> r >> g >> b;
-		entity.color.r = static_cast<std::uint8_t>(255 * r);
-		entity.color.g = static_cast<std::uint8_t>(255 * g);
-		entity.color.b = static_cast<std::uint8_t>(255 * b);
-		entity.color.a = 255;
+			>> entity.color.r >> entity.color.g >> entity.color.b;
+		entity.color.a = 1.0f;
 		entity.is_active = true;
 		return input;
 	}
