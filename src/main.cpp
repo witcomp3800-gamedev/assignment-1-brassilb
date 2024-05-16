@@ -105,7 +105,7 @@ namespace a1 {
 		 * @param scale Scale factor
 		 * @return Overflow in pixels
 		 */
-		virtual Vector2 calc_overflow(Window window, Position position, float scale) const = 0;
+		virtual Vector2 calc_overflow(const Window& window, Position position, float scale) const = 0;
 
 		/**
 		 * Draws a shape with specified position, scale, and color.
@@ -135,8 +135,7 @@ namespace a1 {
 		 */
 		Circle(float radius) : radius(radius) {}
 
-		// TODO
-		Vector2 calc_overflow(Window window, Position position, float scale) const override { return {}; }
+		Vector2 calc_overflow(const Window& window, Position position, float scale) const override;
 		void draw(Position position, float scale, Color color) const override;
 	};
 
@@ -161,8 +160,7 @@ namespace a1 {
 		 */
 		Rectangle(float width, float height) : width(width), height(height) {}
 
-		// TODO
-		Vector2 calc_overflow(Window window, Position position, float scale) const override { return {}; }
+		Vector2 calc_overflow(const Window& window, Position position, float scale) const override;
 		void draw(Position position, float scale, Color color) const override;
 	};
 
@@ -226,6 +224,16 @@ namespace a1 {
 	 */
 	Config load_config(const std::filesystem::path& path);
 
+	/*
+	 * Moves entity, adjusting position and velocity.
+	 * @details If the entity shape collides with the window bounds, the velocity
+				vector is adjusted in the x and/or y direction so the shape will
+				bounce off the edge of the window.
+	 * @param entity Entity object to move
+	 * @param window Containing window
+	 */
+	void move(Entity& entity, const Window& window);
+
 	/**
 	 * Reads an entity with a circle from an input stream.
 	 * @param input Input stream
@@ -233,7 +241,6 @@ namespace a1 {
 	 * @return Input stream (for chaining)
 	 */
 	std::istream& read_circle_entity(std::istream& input, Entity& obj);
-
 
 	/**
 	 * Reads an entity's common components (i.e. not the shape) from an input stream.
@@ -279,6 +286,7 @@ int main(void) {
 	//--------------------------------------------------------------------------------------
 	bool draw_shapes_enabled = true;
 	bool draw_names_enabled = true;
+	bool move_enabled = true;
 	const auto font = LoadFont(font_asset.file.string().c_str());
 
 	//shape properties to draw on the screen (circle for this example)
@@ -300,10 +308,14 @@ int main(void) {
 	{
 		// Update
 		//----------------------------------------------------------------------------------
-
-		//move circle
-		circX+=circSpeedX;
-		circY+=circSpeedY;
+		for( auto& entity : entities ) {
+			if( !entity.is_active ) {
+				continue;
+			}
+			if( move_enabled ) {
+				move(entity, window);
+			}
+		}
 
 		// Draw
 		//----------------------------------------------------------------------------------
@@ -389,6 +401,17 @@ int main(void) {
 }
 
 namespace a1 {
+	Vector2 Circle::calc_overflow(const Window& window, Position position, float scale) const {
+		float min_x = position.x - scale * radius;
+		float min_y = position.y - scale * radius;
+		float max_x = position.x + scale * radius;
+		float max_y = position.y + scale * radius;
+		return {
+			min_x < 0 ? min_x : max_x > window.width ? max_x - window.width : 0,
+			min_y < 0 ? min_y : max_y > window.height ? max_y - window.height : 0
+		};
+	}
+
 	void Circle::draw(Position position, float scale, Color color) const {
 		DrawCircle(
 			static_cast<int>(position.x),
@@ -396,6 +419,17 @@ namespace a1 {
 			radius * scale,
 			ColorFromNormalized({ color.r, color.g, color.b, color.a })
 		);
+	}
+
+	Vector2 Rectangle::calc_overflow(const Window& window, Position position, float scale) const {
+		float min_x = position.x - scale * width / 2;
+		float min_y = position.y - scale * height / 2;
+		float max_x = position.x + scale * width / 2;
+		float max_y = position.y + scale * height / 2;
+		return {
+			min_x < 0 ? min_x : max_x > window.width ? max_x - window.width : 0,
+			min_y < 0 ? min_y : max_y > window.height ? max_y - window.height : 0
+		};
 	}
 
 	void Rectangle::draw(Position position, float scale, Color color) const {
@@ -451,7 +485,7 @@ namespace a1 {
 			ColorFromNormalized({ color.r, color.g, color.b, color.a })
 		);
 
-		
+
 	}
 
 	void draw_shape(const Entity& entity) {
@@ -466,6 +500,24 @@ namespace a1 {
 			throw std::runtime_error("Failed to read configuration file.");
 		}
 		return config;
+	}
+
+	void move(Entity& entity, const Window& window) {
+		const auto next_position = Position{
+			entity.position.x + entity.velocity.x,
+			entity.position.y + entity.velocity.y
+		};
+		const auto overflow = entity.shape->calc_overflow(window, next_position, entity.scale);
+		if( overflow.x != 0 ) {
+			entity.velocity.x = -entity.velocity.x;
+		}
+		if( overflow.y != 0 ) {
+			entity.velocity.y = -entity.velocity.y;
+		}
+		entity.position ={
+			entity.position.x + entity.velocity.x,
+			entity.position.y + entity.velocity.y
+		};
 	}
 
 	std::istream& read_circle_entity(std::istream& input, Entity& entity) {
