@@ -339,19 +339,6 @@ int main(void) {
 	bool move_enabled = true;
 	const auto font = LoadFont(font_asset.file.string().c_str());
 
-	//shape properties to draw on the screen (circle for this example)
-	//units of size and speed are in pixels
-	float circRadius=50;
-	float circSpeedX=1.0f;
-	float circSpeedY=0.5f;
-	float circX=50.0f;
-	float circY=50.0f;
-	float color[3] ={ 0.0f,0.0,1.0f }; //color is from 0-1
-
-	//Let's draw some text to the screen too
-	std::string strText= "Some Text";
-	std::string newText= strText;
-
 	// Main game loop
 	//--------------------------------------------------------------------------------------
 	while( !WindowShouldClose() )    // Detect window close button or ESC key
@@ -389,20 +376,20 @@ int main(void) {
 
 		//********** ImGUI Content *********
 
-		//Draw imgui stuff last so it is over the top of everything else
 		rlImGuiBegin();
+		ImGui::SetNextWindowSize(ImVec2(400, 400));
+		ImGui::Begin("Assignment 1 Controls", NULL, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoCollapse);
 
-		//sets the next window to be at this position
-		//also uses the imgui.ini that gets created at first run
-		ImGui::SetNextWindowSize(ImVec2(350, 250));
-		//creates a new window
-		ImGui::Begin("My Window", NULL, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoCollapse);
-		ImGui::Text("The Window Text!");
-		//checkboxes, they directly modify the value (which is why we send a reference)
-		ImGui::Checkbox("Draw Cricle", &draw_shapes_enabled);
+		ImGui::SeparatorText("All Shape Controls");
+		ImGui::Checkbox("Draw Shapes", &draw_shapes_enabled);
 		ImGui::SameLine();
 		ImGui::Checkbox("Draw Text", &draw_names_enabled);
+		ImGui::SameLine();
+		ImGui::Checkbox("Simulate", &move_enabled);
 
+		ImGui::SeparatorText("Selected Shape Controls");
+
+		/*
 		//slider, again directly modifies the value and limites between 0 and 300 for this example
 		ImGui::SliderFloat("Radius", &circRadius, 0.0f, 300.0f);
 
@@ -426,14 +413,9 @@ int main(void) {
 			circY=50.0;
 			circRadius=50;
 		}
-		//ends this window
+		*/
+
 		ImGui::End();
-
-		//show ImGui Demo Content if you want to see it
-		//bool open = true;
-		//ImGui::ShowDemoWindow(&open);
-
-	// end ImGui Content
 		rlImGuiEnd();
 
 		EndDrawing();
