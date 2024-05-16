@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -98,6 +99,11 @@ namespace a1 {
 	 */
 	class Shape {
 	public:
+		/**
+		 * Destructor
+		 */
+		virtual ~Shape() = default;
+
 		/*
 		 * Calculates how much a shape overflows a window given a position and scale.
 		 * @param window Containing window
@@ -114,6 +120,12 @@ namespace a1 {
 		 * @param color Fill color
 		 */
 		virtual void draw(Position position, float scale, Color color) const = 0;
+
+		/**
+		 * Creates a new copy of this shape polymorphically.
+		 * @return Owning pointer to new shape
+		 */
+		virtual Shape* clone() const = 0;
 	};
 
 	/**
@@ -137,6 +149,7 @@ namespace a1 {
 
 		Vector2 calc_overflow(const Window& window, Position position, float scale) const override;
 		void draw(Position position, float scale, Color color) const override;
+		Shape* clone() const override { return new Circle{ *this }; }
 	};
 
 	/**
@@ -162,20 +175,57 @@ namespace a1 {
 
 		Vector2 calc_overflow(const Window& window, Position position, float scale) const override;
 		void draw(Position position, float scale, Color color) const override;
+		Shape* clone() const override { return new Rectangle{ *this }; }
 	};
 
 	/**
-	 *
+	 * Game entity
 	 */
 	class Entity {
 	public:
 		std::string name;
 		Position position;
 		Velocity velocity;
-		std::shared_ptr<Shape> shape;
+		std::unique_ptr<Shape> shape;
 		float scale = 1.0f;
 		Color color;
 		bool is_active = false;
+
+		/**
+		 * Creates a default deactivated entity.
+		 */
+		Entity() = default;
+
+		/**
+		 * Copy constructor (deep copy)
+		 * @param other Entity object to copy
+		 */
+		Entity(const Entity& other);
+
+		/**
+		 * Move constructor
+		 * @param other Entity object to move from
+		 */
+		Entity(Entity&& other) noexcept;
+
+		/**
+		 * Destructor
+		 */
+		~Entity() = default;
+
+		/**
+		 * Copy assignment operator (deep copy)
+		 * @param right Entity object to copy
+		 * @return self (for chaining)
+		 */
+		Entity& operator =(const Entity& right);
+
+		/**
+		 * Move assignment operator
+		 * @param right Entity object to move from
+		 * @return self (for chaining)
+		 */
+		Entity& operator =(Entity&& right) noexcept;
 	};
 
 	/**
@@ -432,6 +482,7 @@ namespace a1 {
 		};
 	}
 
+
 	void Rectangle::draw(Position position, float scale, Color color) const {
 		DrawRectangle(
 			static_cast<int>(position.x - width / 2),
@@ -440,6 +491,48 @@ namespace a1 {
 			static_cast<int>(height),
 			ColorFromNormalized({ color.r, color.g, color.b, color.a })
 		);
+	}
+
+	Entity::Entity(const Entity& other) :
+		name(other.name),
+		position(other.position),
+		velocity(other.velocity),
+		shape(other.shape->clone()),
+		color(other.color),
+		is_active(other.is_active) {
+	}
+
+	Entity::Entity(Entity&& other) noexcept :
+		name(std::move(other.name)),
+		position(other.position),
+		velocity(other.velocity),
+		shape(std::move(other.shape)),
+		color(other.color),
+		is_active(other.is_active) {
+	}
+
+	Entity& Entity::operator =(const Entity& right) {
+		if( &right != this ) {
+			name = right.name;
+			position = right.position;
+			velocity = right.velocity;
+			shape = std::unique_ptr<Shape>{ right.shape->clone() };
+			color = right.color;
+			is_active = right.is_active;
+		}
+		return *this;
+	}
+
+	Entity& Entity::operator =(Entity&& right) noexcept {
+		if( &right != this ) {
+			name = std::move(right.name);
+			position = right.position;
+			velocity = right.velocity;
+			shape = std::move(right.shape);
+			color = right.color;
+			is_active = right.is_active;
+		}
+		return *this;
 	}
 
 	std::istream& operator >>(std::istream& input, Config& obj) {
@@ -484,8 +577,6 @@ namespace a1 {
 			1.0f,
 			ColorFromNormalized({ color.r, color.g, color.b, color.a })
 		);
-
-
 	}
 
 	void draw_shape(const Entity& entity) {
@@ -523,7 +614,7 @@ namespace a1 {
 	std::istream& read_circle_entity(std::istream& input, Entity& entity) {
 		float radius;
 		if( read_common_components(input, entity) && input >> radius ) {
-			entity.shape = std::make_shared<Circle>(radius);
+			entity.shape = std::make_unique<Circle>(radius);
 		}
 		return input;
 	}
@@ -542,7 +633,7 @@ namespace a1 {
 	std::istream& read_rectangle_entity(std::istream& input, Entity& entity) {
 		float width, height;
 		if( read_common_components(input, entity) && input >> width >> height ) {
-			entity.shape = std::make_shared<Rectangle>(width, height);
+			entity.shape = std::make_unique<Rectangle>(width, height);
 		}
 		return input;
 	}
