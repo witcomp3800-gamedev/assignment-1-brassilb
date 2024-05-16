@@ -137,7 +137,7 @@ namespace a1 {
 
 		// TODO
 		Vector2 calc_overflow(Window window, Position position, float scale) const override { return {}; }
-		void draw(Position position, float scale, Color color) const override {}
+		void draw(Position position, float scale, Color color) const override;
 	};
 
 	/**
@@ -163,7 +163,7 @@ namespace a1 {
 
 		// TODO
 		Vector2 calc_overflow(Window window, Position position, float scale) const override { return {}; }
-		void draw(Position position, float scale, Color color) const override {}
+		void draw(Position position, float scale, Color color) const override;
 	};
 
 	/**
@@ -175,9 +175,9 @@ namespace a1 {
 		Position position;
 		Velocity velocity;
 		std::shared_ptr<Shape> shape;
-		float scale;
+		float scale = 1.0f;
 		Color color;
-		bool is_active;
+		bool is_active = false;
 	};
 
 	/**
@@ -203,11 +203,17 @@ namespace a1 {
 	std::istream& operator >>(std::istream& input, Config& obj);
 
 	/**
+	 * Draws an entity's shape to the screen with raylib.
+	 * @param entity Entity object to draw
+	 */
+	void draw_shape(const Entity& entity);
+
+	/**
 	 * Loads game configuration from the specified file path.
 	 * @param path Input file path
 	 * @throws std::runtime_error if file not read
 	 * @return Input stream (for chaining)
-* 
+*
 	 */
 	Config load_config(const std::filesystem::path& path);
 
@@ -245,7 +251,8 @@ int main(void) {
 	//--------------------------------------------------------------------------------------
 	const auto input_path = std::filesystem::path{ "assets/input.txt" };
 	const auto [window, font_asset, entity_templates] = a1::load_config(input_path);
-	auto entities = std::vector<a1::Entity>{ entity_templates.size() };
+	auto entities = std::vector<a1::Entity>{};
+	entities.reserve(entity_templates.size());
 	std::copy(entity_templates.begin(), entity_templates.end(), std::back_inserter(entities));
 
 	SetConfigFlags(FLAG_WINDOW_HIGHDPI);
@@ -261,13 +268,13 @@ int main(void) {
 
 	// General variables
 	//--------------------------------------------------------------------------------------
+	bool draw_shapes_enabled = true;
 
 	//shape properties to draw on the screen (circle for this example)
 	//units of size and speed are in pixels
 	float circRadius=50;
 	float circSpeedX=1.0f;
 	float circSpeedY=0.5f;
-	bool drawCirc=true;
 	float circX=50.0f;
 	float circY=50.0f;
 	float color[3] ={ 0.0f,0.0,1.0f }; //color is from 0-1
@@ -299,12 +306,15 @@ int main(void) {
 
 		//********** Raylib Drawing Content **********
 
-		//draw the cricle (center x, center y, radius, color(r,g,b,a))
-		if( drawCirc ) {
-			DrawCircle((int)circX, (int)circY, circRadius, ColorFromNormalized({ color[0],color[1],color[2],1.0f }));
+		for( const auto& entity : entities ) {
+			if( !entity.is_active ) {
+				continue;
+			}
+			if( draw_shapes_enabled ) {
+				draw_shape(entity);
+			}
 		}
 
-		//draw the text
 		if( drawText ) {
 			//get the size (x and y) of the text object
 			//(font,c string, font size, font spaceing)
@@ -327,7 +337,7 @@ int main(void) {
 		ImGui::Begin("My Window", NULL, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoCollapse);
 		ImGui::Text("The Window Text!");
 		//checkboxes, they directly modify the value (which is why we send a reference)
-		ImGui::Checkbox("Draw Cricle", &drawCirc);
+		ImGui::Checkbox("Draw Cricle", &draw_shapes_enabled);
 		ImGui::SameLine();
 		ImGui::Checkbox("Draw Text", &drawText);
 
@@ -379,6 +389,25 @@ int main(void) {
 }
 
 namespace a1 {
+	void Circle::draw(Position position, float scale, Color color) const {
+		DrawCircle(
+			static_cast<int>(position.x),
+			static_cast<int>(position.y),
+			radius * scale,
+			{ color.r, color.g, color.b, color.a }
+		);
+	}
+
+	void Rectangle::draw(Position position, float scale, Color color) const {
+		DrawRectangle(
+			static_cast<int>(position.x - width / 2),
+			static_cast<int>(position.y - height / 2),
+			static_cast<int>(width),
+			static_cast<int>(height),
+			{ color.r, color.g, color.b, color.a }
+		);
+	}
+
 	std::istream& operator >>(std::istream& input, Config& obj) {
 		std::string s;
 		while( input >> s ) {
@@ -411,6 +440,10 @@ namespace a1 {
 		return input;
 	}
 
+	void draw_shape(const Entity& entity) {
+		entity.shape->draw(entity.position, entity.scale, entity.color);
+	}
+
 	Config load_config(const std::filesystem::path& path) {
 		auto input_file = std::ifstream{ path };
 		a1::Config config;
@@ -430,19 +463,22 @@ namespace a1 {
 	}
 
 	std::istream& read_common_components(std::istream& input, Entity& entity) {
+		float r, g, b;
 		input
 			>> entity.name
 			>> entity.position.x >> entity.position.y
 			>> entity.velocity.x >> entity.velocity.y
-			>> entity.color.r >> entity.color.g >> entity.color.b;
+			>> r >> g >> b;
+		entity.color.r = static_cast<std::uint8_t>(255 * r);
+		entity.color.g = static_cast<std::uint8_t>(255 * g);
+		entity.color.b = static_cast<std::uint8_t>(255 * b);
 		entity.color.a = 255;
 		entity.is_active = true;
 		return input;
 	}
 
 	std::istream& read_rectangle_entity(std::istream& input, Entity& entity) {
-		float width;
-		float height;
+		float width, height;
 		if( read_common_components(input, entity) && input >> width >> height ) {
 			entity.shape = std::make_shared<Rectangle>(width, height);
 		}
