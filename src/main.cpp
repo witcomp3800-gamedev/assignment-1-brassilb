@@ -657,6 +657,9 @@ namespace a1 {
 		if( ImGui::Button("Reset") ) {
 			entities.clear();
 			std::copy(entity_templates.begin(), entity_templates.end(), std::back_inserter(entities));
+			input.draw_shapes_enabled = true;
+			input.draw_text_enabled = true;
+			input.simulate_enabled = true;
 			input.selected_index = 0;
 			change_selection(input, entities);
 		}
