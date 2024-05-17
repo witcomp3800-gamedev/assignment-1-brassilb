@@ -337,6 +337,8 @@ namespace a1 {
 	 */
 	void handle_rendering(const Input& input, const Font& font, const FontAsset& font_asset, const std::vector<Entity>& entities);
 
+	void handle_reset_ui(Input& input, const std::vector<Entity>& entity_templates, std::vector<Entity>& entities);
+
 	/**
 	 * Updates game physics simulation.
 	 * @param input Input data payload
@@ -453,10 +455,11 @@ int main(void) {
 
 		//********** ImGUI Content *********
 		rlImGuiBegin();
-		ImGui::SetNextWindowSize(ImVec2(400, 400));
+		ImGui::SetNextWindowSize(ImVec2(400, 420));
 		ImGui::Begin("Assignment 1 Controls", NULL, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoCollapse);
 		handle_all_shape_controls_ui(input);
 		handle_selected_shape_ui(input, entities);
+		handle_reset_ui(input, entity_templates, entities);
 		ImGui::End();
 		rlImGuiEnd();
 
@@ -646,6 +649,16 @@ namespace a1 {
 			if( input.draw_text_enabled ) {
 				draw_name(entity, font, font_asset.size, font_asset.color);
 			}
+		}
+	}
+
+	void handle_reset_ui(Input& input, const std::vector<Entity>& entity_templates, std::vector<Entity>& entities) {
+		ImGui::SeparatorText("");
+		if( ImGui::Button("Reset") ) {
+			entities.clear();
+			std::copy(entity_templates.begin(), entity_templates.end(), std::back_inserter(entities));
+			input.selected_index = 0;
+			change_selection(input, entities);
 		}
 	}
 
