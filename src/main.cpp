@@ -281,6 +281,8 @@ namespace a1 {
 		float velocity[2] ={ 0.0f, 0.0f };
 		float color[3] ={ 1.0f, 1.0f, 1.0f };
 		std::string name;
+		float text_size;
+		float text_color[3] ={ 1.0f, 1.0f, 1.0f };
 	};
 
 	/**
@@ -310,7 +312,7 @@ namespace a1 {
 	 * @param font_size Text font size
 	 * @param color Text color
 	 */
-	void draw_name(const Entity& entity, const Font& font, float font_size, Color color);
+	void draw_name(const Input& input, const Entity& entity, const Font& font);
 
 	/**
 	 * Draws an entity's shape to the screen with raylib.
@@ -328,7 +330,7 @@ namespace a1 {
 	 */
 	void handle_input(Input& input, const Input& previous_input, std::vector<Entity>& entities);
 
-	/*
+	/**
 	 * Provides input fields for universal controls.
 	 * @param input Input data payload
 	 */
@@ -348,8 +350,16 @@ namespace a1 {
 	 * @param input Input data payload
 	 * @param entity_templates Source of game entities to copy
 	 * @param entities Game entities
+	 * @param font_asset Font asset for entity nametag size & color
 	 */
-	void handle_reset_ui(Input& input, const std::vector<Entity>& entity_templates, std::vector<Entity>& entities);
+	void handle_reset_ui(Input& input, const std::vector<Entity>& entity_templates, std::vector<Entity>& entities, const FontAsset& font_asset);
+
+	/**
+	 * Provides input fields for selected entity.
+	 * @param input Input data payload
+	 * @param entities Game entities
+	 */
+	void handle_selected_shape_ui(Input& input, std::vector<Entity>& entities);
 
 	/**
 	 * Updates game physics simulation.
@@ -360,11 +370,18 @@ namespace a1 {
 	void handle_simulation(const Input& input, const Window& window, std::vector<Entity>& entities);
 
 	/**
-	 * Provides input fields for selected entity.
+	 * Provides input fields for nametag font size & color.
+	 * @param input Input data payload
+	 */
+	void handle_text_ui(Input& input);
+
+	/**
+	 * Populates input fields with initial values.
 	 * @param input Input data payload
 	 * @param entities Game entities
+	 * @param font_asset Font asset for entity nametag size & color
 	 */
-	void handle_selected_shape_ui(Input& input, std::vector<Entity>& entities);
+	void initialize_ui(Input& input, const std::vector<Entity>& entities, const FontAsset& font_asset);
 
 	/**
 	 * Loads game configuration from the specified file path.
@@ -375,7 +392,7 @@ namespace a1 {
 	 */
 	Config load_config(const std::filesystem::path& path);
 
-	/*
+	/**
 	 * Moves entity, adjusting position and velocity.
 	 * @details If the entity shape collides with the window bounds, the velocity
 				vector is adjusted in the x and/or y direction so the shape will
@@ -446,8 +463,7 @@ int main(void) {
 	auto previous_input = a1::Input{};
 	const auto font = LoadFont(font_asset.file.string().c_str());
 
-	// Set up initial selection
-	change_selection(input, entities);
+	initialize_ui(input, entities, font_asset);
 
 	// Main game loop
 	//--------------------------------------------------------------------------------------
@@ -470,11 +486,12 @@ int main(void) {
 
 		//********** ImGUI Content *********
 		rlImGuiBegin();
-		ImGui::SetNextWindowSize(ImVec2(400, 420));
+		ImGui::SetNextWindowSize(ImVec2(400, 520));
 		ImGui::Begin("Assignment 1 Controls", NULL, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoCollapse);
 		handle_all_shape_controls_ui(input);
 		handle_selected_shape_ui(input, entities);
-		handle_reset_ui(input, entity_templates, entities);
+		handle_text_ui(input);
+		handle_reset_ui(input, entity_templates, entities, font_asset);
 		ImGui::End();
 		rlImGuiEnd();
 
@@ -619,15 +636,15 @@ namespace a1 {
 		input.name = entity.name;
 	}
 
-	void draw_name(const Entity& entity, const Font& font, float font_size, Color color) {
-		const auto text_size = MeasureTextEx(font, entity.name.c_str(), font_size, 1.0f);
+	void draw_name(const Input& input, const Entity& entity, const Font& font) {
+		const auto text_size = MeasureTextEx(font, entity.name.c_str(), input.text_size, 1.0f);
 		DrawTextEx(
 			font,
 			entity.name.c_str(),
 			{ entity.position.x - text_size.x / 2, entity.position.y - text_size.y / 2 },
-			font_size,
+			input.text_size,
 			1.0f,
-			ColorFromNormalized({ color.r, color.g, color.b, color.a })
+			ColorFromNormalized({ input.text_color[0], input.text_color[1], input.text_color[2], 1.0f })
 		);
 	}
 
@@ -665,12 +682,12 @@ namespace a1 {
 				draw_shape(entity);
 			}
 			if( input.draw_text_enabled ) {
-				draw_name(entity, font, font_asset.size, font_asset.color);
+				draw_name(input, entity, font);
 			}
 		}
 	}
 
-	void handle_reset_ui(Input& input, const std::vector<Entity>& entity_templates, std::vector<Entity>& entities) {
+	void handle_reset_ui(Input& input, const std::vector<Entity>& entity_templates, std::vector<Entity>& entities, const FontAsset& font_asset) {
 		ImGui::SeparatorText("");
 		if( ImGui::Button("Reset") ) {
 			entities.clear();
@@ -679,18 +696,7 @@ namespace a1 {
 			input.draw_text_enabled = true;
 			input.simulate_enabled = true;
 			input.selected_index = 0;
-			change_selection(input, entities);
-		}
-	}
-
-	void handle_simulation(const Input& input, const Window& window, std::vector<Entity>& entities) {
-		for( auto& entity : entities ) {
-			if( !entity.is_active ) {
-				continue;
-			}
-			if( input.simulate_enabled ) {
-				move(entity, window);
-			}
+			initialize_ui(input, entities, font_asset);
 		}
 	}
 
@@ -716,6 +722,31 @@ namespace a1 {
 		ImGui::SliderFloat2("Velocity", input.velocity, -75.0f, 75.0f);
 		ImGui::ColorEdit3("Color", input.color);
 		ImGui::InputText("Name", &input.name);
+	}
+
+	void handle_simulation(const Input& input, const Window& window, std::vector<Entity>& entities) {
+		for( auto& entity : entities ) {
+			if( !entity.is_active ) {
+				continue;
+			}
+			if( input.simulate_enabled ) {
+				move(entity, window);
+			}
+		}
+	}
+
+	void handle_text_ui(Input& input) {
+		ImGui::SeparatorText("Text Controls");
+		ImGui::SliderFloat("Size##Text", &input.text_size, 8.0f, 72.0f);
+		ImGui::ColorEdit3("Color##Text", input.text_color);
+	}
+
+	void initialize_ui(Input& input, const std::vector<Entity>& entities, const FontAsset& font_asset) {
+		change_selection(input, entities);
+		input.text_size = font_asset.size;
+		input.text_color[0] = font_asset.color.r;
+		input.text_color[1] = font_asset.color.g;
+		input.text_color[2] = font_asset.color.b;
 	}
 
 	Config load_config(const std::filesystem::path& path) {
