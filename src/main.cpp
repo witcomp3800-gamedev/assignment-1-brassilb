@@ -431,8 +431,11 @@ int main(void) {
 	// General variables
 	//--------------------------------------------------------------------------------------
 	auto input = a1::Input{};
-	auto previous_input = a1::Input{ .selected_index = std::numeric_limits<std::size_t>::max() };
+	auto previous_input = a1::Input{};
 	const auto font = LoadFont(font_asset.file.string().c_str());
+
+	// Set up initial selection
+	change_selection(input, entities);
 
 	// Main game loop
 	//--------------------------------------------------------------------------------------
@@ -590,6 +593,9 @@ namespace a1 {
 	}
 
 	void change_selection(Input& input, const std::vector<Entity>& entities) {
+		if( input.selected_index >= entities.size() ) {
+			return;
+		}
 		const auto& entity = entities[input.selected_index];
 		input.is_active = entity.is_active;
 		input.scale = entity.scale;
