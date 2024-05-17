@@ -238,6 +238,22 @@ namespace a1 {
 	};
 
 	/**
+	 * Payload for input with Dear ImGui
+	 */
+	struct Input {
+	public:
+		bool draw_shapes_enabled = true;
+		bool draw_text_enabled = true;
+		bool simulate_enabled = true;
+		std::size_t selected_index = 0;
+		bool is_active = true;
+		float scale = 1.0f;
+		float velocity[2] ={ 0.0f, 0.0f };
+		float color[3] ={ 1.0f, 1.0f, 1.0f };
+		std::string name;
+	};
+
+	/**
 	 * Reads game config from an input stream.
 	 * @details Each line may contain one of the following, in any order:
 	 *     - Window [Caption] [Width] [Height]
@@ -334,9 +350,7 @@ int main(void) {
 
 	// General variables
 	//--------------------------------------------------------------------------------------
-	bool draw_shapes_enabled = true;
-	bool draw_names_enabled = true;
-	bool move_enabled = true;
+	a1::Input input;
 	const auto font = LoadFont(font_asset.file.string().c_str());
 
 	// Main game loop
@@ -349,7 +363,7 @@ int main(void) {
 			if( !entity.is_active ) {
 				continue;
 			}
-			if( move_enabled ) {
+			if( input.simulate_enabled ) {
 				move(entity, window);
 			}
 		}
@@ -366,10 +380,10 @@ int main(void) {
 			if( !entity.is_active ) {
 				continue;
 			}
-			if( draw_shapes_enabled ) {
+			if( input.draw_shapes_enabled ) {
 				draw_shape(entity);
 			}
-			if( draw_names_enabled ) {
+			if( input.draw_text_enabled ) {
 				draw_name(entity, font, font_asset.size, font_asset.color);
 			}
 		}
@@ -381,20 +395,19 @@ int main(void) {
 		ImGui::Begin("Assignment 1 Controls", NULL, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoCollapse);
 
 		ImGui::SeparatorText("All Shape Controls");
-		ImGui::Checkbox("Draw Shapes", &draw_shapes_enabled);
+		ImGui::Checkbox("Draw Shapes", &input.draw_shapes_enabled);
 		ImGui::SameLine();
-		ImGui::Checkbox("Draw Text", &draw_names_enabled);
+		ImGui::Checkbox("Draw Text", &input.draw_text_enabled);
 		ImGui::SameLine();
-		ImGui::Checkbox("Simulate", &move_enabled);
+		ImGui::Checkbox("Simulate", &input.simulate_enabled);
 
 		ImGui::SeparatorText("Selected Shape Controls");
 		if( entities.size() > 0 ) {
-			static std::size_t current_index = 0;
-			if( ImGui::BeginCombo("Shape", entities[current_index].name.c_str()) ) {
+			if( ImGui::BeginCombo("Shape", entities[input.selected_index].name.c_str()) ) {
 				for( std::size_t i = 0; i < entities.size(); ++i ) {
-					const bool is_selected = current_index == i;
+					const bool is_selected = input.selected_index == i;
 					if( ImGui::Selectable(entities[i].name.c_str(), is_selected) ) {
-						current_index = i;
+						input.selected_index = i;
 					}
 					if( is_selected ) {
 						ImGui::SetItemDefaultFocus();
@@ -402,7 +415,7 @@ int main(void) {
 				}
 				ImGui::EndCombo();
 			}
-			ImGui::Checkbox("Active", &entities[current_index].is_active);
+			ImGui::Checkbox("Active", &entities[input.selected_index].is_active);
 		}
 
 		/*
