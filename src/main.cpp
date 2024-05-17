@@ -246,6 +246,7 @@ namespace a1 {
 		bool draw_text_enabled = true;
 		bool simulate_enabled = true;
 		std::size_t selected_index = 0;
+		std::size_t previous_index = -1;
 		bool is_active = true;
 		float scale = 1.0f;
 		float velocity[2] ={ 0.0f, 0.0f };
@@ -323,6 +324,30 @@ namespace a1 {
 	 * @return Input stream (for chaining)
 	 */
 	std::istream& read_rectangle_entity(std::istream& input, Entity& obj);
+
+	/**
+	 * Syncs input and game state.
+	 * @details Updates entity's components following user input. When a new entity
+	 *          is selected, the input fields are updated to reflect the new data.
+	 * @param input Input data payload
+	 * @param entities Pointer to entity data
+	 * @param size Total number of entities
+	 */
+	void handle_input(Input& input, Entity* entities, std::size_t size);
+
+	/*
+	 * Provides input fields for universal controls.
+	 * @param input Input data payload
+	 */
+	void handle_all_shape_controls_ui(Input& input);
+
+	/**
+	 * Provides input fields for selected entity.
+	 * @param input Input data payload
+	 * @param entities Pointer to entity data
+	 * @param size Total number of entities
+	 */
+	void handle_selected_shape_ui(Input& input, Entity* entities, std::size_t size);
 }
 
 //------------------------------------------------------------------------------------
@@ -359,6 +384,7 @@ int main(void) {
 	{
 		// Update
 		//----------------------------------------------------------------------------------
+		handle_input(input, entities.data(), entities.size());
 		for( auto& entity : entities ) {
 			if( !entity.is_active ) {
 				continue;
@@ -394,33 +420,12 @@ int main(void) {
 		ImGui::SetNextWindowSize(ImVec2(400, 400));
 		ImGui::Begin("Assignment 1 Controls", NULL, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoCollapse);
 
-		ImGui::SeparatorText("All Shape Controls");
-		ImGui::Checkbox("Draw Shapes", &input.draw_shapes_enabled);
-		ImGui::SameLine();
-		ImGui::Checkbox("Draw Text", &input.draw_text_enabled);
-		ImGui::SameLine();
-		ImGui::Checkbox("Simulate", &input.simulate_enabled);
-
-		ImGui::SeparatorText("Selected Shape Controls");
-		if( entities.size() > 0 ) {
-			if( ImGui::BeginCombo("Shape", entities[input.selected_index].name.c_str()) ) {
-				for( std::size_t i = 0; i < entities.size(); ++i ) {
-					const bool is_selected = input.selected_index == i;
-					if( ImGui::Selectable(entities[i].name.c_str(), is_selected) ) {
-						input.selected_index = i;
-					}
-					if( is_selected ) {
-						ImGui::SetItemDefaultFocus();
-					}
-				}
-				ImGui::EndCombo();
-			}
-			ImGui::Checkbox("Active", &entities[input.selected_index].is_active);
-		}
+		handle_all_shape_controls_ui(input);
+		handle_selected_shape_ui(input, entities.data(), entities.size());
 
 		/*
 		//slider, again directly modifies the value and limites between 0 and 300 for this example
-		ImGui::SliderFloat("Radius", &circRadius, 0.0f, 300.0f);
+
 
 		//color picker button, directly modifies the color (3 element float array)
 		ImGui::ColorEdit3("Circle Color", color);
@@ -592,6 +597,56 @@ namespace a1 {
 
 	void draw_shape(const Entity& entity) {
 		entity.shape->draw(entity.position, entity.scale, entity.color);
+	}
+
+	void handle_all_shape_controls_ui(Input& input) {
+		ImGui::SeparatorText("All Shape Controls");
+		ImGui::Checkbox("Draw Shapes", &input.draw_shapes_enabled);
+		ImGui::SameLine();
+		ImGui::Checkbox("Draw Text", &input.draw_text_enabled);
+		ImGui::SameLine();
+		ImGui::Checkbox("Simulate", &input.simulate_enabled);
+	}
+
+	void handle_input(Input& input, Entity* entities, std::size_t size) {
+		const auto index = input.selected_index;
+		if( index >= size ) {
+			return;
+		}
+		auto& entity = entities[index];
+		if( input.previous_index == index ) {
+			entity.is_active = input.is_active;
+			entity.scale = input.scale;
+		}
+		else {
+			input.previous_index = index;
+			input.is_active = entity.is_active;
+			input.scale = entity.scale;
+		}
+	}
+
+	void handle_selected_shape_ui(Input& input, Entity* entities, std::size_t size) {
+		ImGui::SeparatorText("Selected Shape Controls");
+		if( size == 0 ) {
+			return;
+		}
+		if( ImGui::BeginCombo("Shape", entities[input.selected_index].name.c_str()) ) {
+			for( std::size_t i = 0; i < size; ++i ) {
+				const bool is_selected = input.selected_index == i;
+				if( ImGui::Selectable(entities[i].name.c_str(), is_selected) ) {
+					input.selected_index = i;
+				}
+				if( is_selected ) {
+					ImGui::SetItemDefaultFocus();
+				}
+			}
+			ImGui::EndCombo();
+		}
+		ImGui::Checkbox("Active", &input.is_active);
+		ImGui::SliderFloat("Scale", &input.scale, 0.1f, 5.0f);
+		// TODO Velocity
+		// TODO Color
+		// TODO Name
 	}
 
 	Config load_config(const std::filesystem::path& path) {
