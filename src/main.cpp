@@ -736,10 +736,10 @@ namespace a1 {
 		const auto aabb = entity.shape->aabb(next_position, entity.scale);
 		// If the shape goes outside the screen, adjust velocity in the appropriate
 		// direction
-		if( aabb.x < 0 || aabb.x > window.width ) {
+		if( aabb.x < 0 || aabb.x + aabb.width > window.width ) {
 			entity.velocity.x = -entity.velocity.x;
 		}
-		if( aabb.y < 0 || aabb.y > window.height ) {
+		if( aabb.y < 0 || aabb.y + aabb.height > window.height ) {
 			entity.velocity.y = -entity.velocity.y;
 		}
 		entity.position ={
