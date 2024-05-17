@@ -507,10 +507,10 @@ namespace a1 {
 
 	void Rectangle::draw(Position position, float scale, Color color) const {
 		DrawRectangle(
-			static_cast<int>(position.x - width / 2),
-			static_cast<int>(position.y - height / 2),
-			static_cast<int>(width),
-			static_cast<int>(height),
+			static_cast<int>(position.x - width * scale / 2),
+			static_cast<int>(position.y - height * scale / 2),
+			static_cast<int>(width * scale),
+			static_cast<int>(height * scale),
 			ColorFromNormalized({ color.r, color.g, color.b, color.a })
 		);
 	}
