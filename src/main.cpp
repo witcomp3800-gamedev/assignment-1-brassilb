@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <string>
 #include <vector>
@@ -246,7 +247,6 @@ namespace a1 {
 		bool draw_text_enabled = true;
 		bool simulate_enabled = true;
 		std::size_t selected_index = 0;
-		std::size_t previous_index = -1;
 		bool is_active = true;
 		float scale = 1.0f;
 		float velocity[2] ={ 0.0f, 0.0f };
@@ -330,10 +330,11 @@ namespace a1 {
 	 * @details Updates entity's components following user input. When a new entity
 	 *          is selected, the input fields are updated to reflect the new data.
 	 * @param input Input data payload
+	 * @param previous_input Previous input data payload
 	 * @param entities Pointer to entity data
 	 * @param size Total number of entities
 	 */
-	void handle_input(Input& input, Entity* entities, std::size_t size);
+	void handle_input(Input& input, const Input& previous_input, Entity* entities, std::size_t size);
 
 	/*
 	 * Provides input fields for universal controls.
@@ -375,7 +376,8 @@ int main(void) {
 
 	// General variables
 	//--------------------------------------------------------------------------------------
-	a1::Input input;
+	auto input = a1::Input{};
+	auto previous_input = a1::Input{ .selected_index = std::numeric_limits<std::size_t>::max() };
 	const auto font = LoadFont(font_asset.file.string().c_str());
 
 	// Main game loop
@@ -384,7 +386,8 @@ int main(void) {
 	{
 		// Update
 		//----------------------------------------------------------------------------------
-		handle_input(input, entities.data(), entities.size());
+		handle_input(input, previous_input, entities.data(), entities.size());
+		previous_input = input;
 		for( auto& entity : entities ) {
 			if( !entity.is_active ) {
 				continue;
@@ -422,32 +425,6 @@ int main(void) {
 
 		handle_all_shape_controls_ui(input);
 		handle_selected_shape_ui(input, entities.data(), entities.size());
-
-		/*
-		//slider, again directly modifies the value and limites between 0 and 300 for this example
-
-
-		//color picker button, directly modifies the color (3 element float array)
-		ImGui::ColorEdit3("Circle Color", color);
-
-		//text input field, directly modifies the string
-		ImGui::InputText("Text", &newText);
-
-		//buttons, returns true if clicked on this frame
-		if( ImGui::Button("Set Text") ) {
-			strText=newText;
-		}
-
-		//The next item will be on the same line as the previous one
-		ImGui::SameLine();
-
-		//Another button
-		if( ImGui::Button("Reset Circle") ) {
-			circX=50.0;
-			circY=50.0;
-			circRadius=50;
-		}
-		*/
 
 		ImGui::End();
 		rlImGuiEnd();
@@ -608,20 +585,39 @@ namespace a1 {
 		ImGui::Checkbox("Simulate", &input.simulate_enabled);
 	}
 
-	void handle_input(Input& input, Entity* entities, std::size_t size) {
+	void handle_input(Input& input, const Input& previous_input, Entity* entities, std::size_t size) {
 		const auto index = input.selected_index;
 		if( index >= size ) {
 			return;
 		}
 		auto& entity = entities[index];
-		if( input.previous_index == index ) {
+		if( previous_input.selected_index == index ) {
 			entity.is_active = input.is_active;
 			entity.scale = input.scale;
+			if( input.velocity[0] == previous_input.velocity[0] ) {
+				input.velocity[0] = entity.velocity.x;
+			}
+			else {
+				entity.velocity.x = input.velocity[0];
+			}
+			if( input.velocity[1] == previous_input.velocity[1] ) {
+				input.velocity[1] = entity.velocity.y;
+			}
+			else {
+				entity.velocity.y = input.velocity[1];
+			}
+			entity.color ={ input.color[0], input.color[1], input.color[2] };
+			entity.name = input.name;
 		}
 		else {
-			input.previous_index = index;
 			input.is_active = entity.is_active;
 			input.scale = entity.scale;
+			input.velocity[0] = entity.velocity.x;
+			input.velocity[1] = entity.velocity.y;
+			input.color[0] = entity.color.r;
+			input.color[1] = entity.color.g;
+			input.color[2] = entity.color.b;
+			input.name = entity.name;
 		}
 	}
 
@@ -644,9 +640,9 @@ namespace a1 {
 		}
 		ImGui::Checkbox("Active", &input.is_active);
 		ImGui::SliderFloat("Scale", &input.scale, 0.1f, 5.0f);
-		// TODO Velocity
-		// TODO Color
-		// TODO Name
+		ImGui::SliderFloat2("Velocity", input.velocity, -75.0f, 75.0f);
+		ImGui::ColorEdit3("Color", input.color);
+		ImGui::InputText("Name", &input.name);
 	}
 
 	Config load_config(const std::filesystem::path& path) {
