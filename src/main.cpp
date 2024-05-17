@@ -388,6 +388,22 @@ int main(void) {
 		ImGui::Checkbox("Simulate", &move_enabled);
 
 		ImGui::SeparatorText("Selected Shape Controls");
+		if( entities.size() > 0 ) {
+			static std::size_t current_index = 0;
+			if( ImGui::BeginCombo("Shape", entities[current_index].name.c_str()) ) {
+				for( std::size_t i = 0; i < entities.size(); ++i ) {
+					const bool is_selected = current_index == i;
+					if( ImGui::Selectable(entities[i].name.c_str(), is_selected) ) {
+						current_index = i;
+					}
+					if( is_selected ) {
+						ImGui::SetItemDefaultFocus();
+					}
+				}
+				ImGui::EndCombo();
+			}
+			ImGui::Checkbox("Active", &entities[current_index].is_active);
+		}
 
 		/*
 		//slider, again directly modifies the value and limites between 0 and 300 for this example
