@@ -96,6 +96,30 @@ namespace a1 {
 	};
 
 	/**
+	 * Axis aligned bounding box.
+	 */
+	struct AABB {
+		float x = 0.0f;
+		float y = 0.0f;
+		float width = 0.0f;
+		float height = 0.0f;
+
+		/**
+		 * Creates default zero-size box.
+		 */
+		AABB()  = default;
+
+		/**
+		 * Creates a box with the specified values.
+		 * @param x X-coordinate
+		 * @param y Y-coordinate
+		 * @param width Rect width
+		 * @param height Rect height
+		 */
+		AABB(float x, float y, float width, float height) : x(x), y(y), width(width), height(height) {}
+	};
+
+	/**
 	 * Represents a 2-dimensional shape which can be drawn to the screen with raylib.
 	 */
 	class Shape {
@@ -106,13 +130,12 @@ namespace a1 {
 		virtual ~Shape() = default;
 
 		/*
-		 * Calculates how much a shape overflows a window given a position and scale.
-		 * @param window Containing window
+		 * Measures an axis aligned bounding box for a given a position and scale.
 		 * @param position Coordinates in pixels
 		 * @param scale Scale factor
-		 * @return Overflow in pixels
+		 * @return Axis aligned bounding box
 		 */
-		virtual Vector2 calc_overflow(const Window& window, Position position, float scale) const = 0;
+		virtual AABB aabb(Position position, float scale) const = 0;
 
 		/**
 		 * Draws a shape with specified position, scale, and color.
@@ -148,9 +171,9 @@ namespace a1 {
 		 */
 		Circle(float radius) : radius(radius) {}
 
-		Vector2 calc_overflow(const Window& window, Position position, float scale) const override;
-		void draw(Position position, float scale, Color color) const override;
+		AABB aabb(Position position, float scale) const override;
 		Shape* clone() const override { return new Circle{ *this }; }
+		void draw(Position position, float scale, Color color) const override;
 	};
 
 	/**
@@ -174,9 +197,9 @@ namespace a1 {
 		 */
 		Rectangle(float width, float height) : width(width), height(height) {}
 
-		Vector2 calc_overflow(const Window& window, Position position, float scale) const override;
-		void draw(Position position, float scale, Color color) const override;
+		AABB aabb(Position position, float scale) const override;
 		Shape* clone() const override { return new Rectangle{ *this }; }
+		void draw(Position position, float scale, Color color) const override;
 	};
 
 	/**
@@ -452,14 +475,12 @@ int main(void) {
 }
 
 namespace a1 {
-	Vector2 Circle::calc_overflow(const Window& window, Position position, float scale) const {
-		float min_x = position.x - scale * radius;
-		float min_y = position.y - scale * radius;
-		float max_x = position.x + scale * radius;
-		float max_y = position.y + scale * radius;
+	AABB Circle::aabb(Position position, float scale) const {
 		return {
-			min_x < 0 ? min_x : max_x > window.width ? max_x - window.width : 0,
-			min_y < 0 ? min_y : max_y > window.height ? max_y - window.height : 0
+			position.x - radius * scale,
+			position.y - radius * scale,
+			2 * radius * scale,
+			2 * radius * scale
 		};
 	}
 
@@ -472,14 +493,12 @@ namespace a1 {
 		);
 	}
 
-	Vector2 Rectangle::calc_overflow(const Window& window, Position position, float scale) const {
-		float min_x = position.x - scale * width / 2;
-		float min_y = position.y - scale * height / 2;
-		float max_x = position.x + scale * width / 2;
-		float max_y = position.y + scale * height / 2;
+	AABB Rectangle::aabb(Position position, float scale) const {
 		return {
-			min_x < 0 ? min_x : max_x > window.width ? max_x - window.width : 0,
-			min_y < 0 ? min_y : max_y > window.height ? max_y - window.height : 0
+			position.x - width * scale / 2,
+			position.y - height * scale / 2,
+			width * scale,
+			height * scale
 		};
 	}
 
@@ -680,11 +699,13 @@ namespace a1 {
 			entity.position.x + entity.velocity.x,
 			entity.position.y + entity.velocity.y
 		};
-		const auto overflow = entity.shape->calc_overflow(window, next_position, entity.scale);
-		if( overflow.x != 0 ) {
+		const auto aabb = entity.shape->aabb(next_position, entity.scale);
+		// If the shape goes outside the screen, adjust velocity in the appropriate
+		// direction
+		if( aabb.x < 0 || aabb.x > window.width ) {
 			entity.velocity.x = -entity.velocity.x;
 		}
-		if( overflow.y != 0 ) {
+		if( aabb.y < 0 || aabb.y > window.height ) {
 			entity.velocity.y = -entity.velocity.y;
 		}
 		entity.position ={
