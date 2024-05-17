@@ -1,3 +1,9 @@
+/**
+ * COMP 4300
+ * Assignment 1
+ * @author Brendan Brassil
+ * @date 2024-05-17
+ */
 #include <include/raylib.h>
 #include <imgui/imgui.h>
 #include <imgui/rlImGui.h>
@@ -337,6 +343,12 @@ namespace a1 {
 	 */
 	void handle_rendering(const Input& input, const Font& font, const FontAsset& font_asset, const std::vector<Entity>& entities);
 
+	/**
+	 * Provides button to reset all game state.
+	 * @param input Input data payload
+	 * @param entity_templates Source of game entities to copy
+	 * @param entities Game entities
+	 */
 	void handle_reset_ui(Input& input, const std::vector<Entity>& entity_templates, std::vector<Entity>& entities);
 
 	/**
