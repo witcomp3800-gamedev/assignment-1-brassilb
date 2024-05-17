@@ -268,6 +268,13 @@ namespace a1 {
 	std::istream& operator >>(std::istream& input, Config& obj);
 
 	/**
+	 * Updates input fields following selection of new entity.
+	 * @param input Input data payload
+	 * @param entities Game entities
+	 */
+	void change_selection(Input& input, const std::vector<Entity>& entities);
+
+	/**
 	 * Draws an entity's name to the screen with raylib.
 	 * @param entity Entity object to draw
 	 * @param font raylib font data
@@ -281,6 +288,46 @@ namespace a1 {
 	 * @param entity Entity object to draw
 	 */
 	void draw_shape(const Entity& entity);
+
+	/**
+	 * Syncs input and game state.
+	 * @details Updates entity's components following user input. When a new entity
+	 *          is selected, the input fields are updated to reflect the new data.
+	 * @param input Input data payload
+	 * @param previous_input Previous input data payload
+	 * @param entities Game entities
+	 */
+	void handle_input(Input& input, const Input& previous_input, std::vector<Entity>& entities);
+
+	/*
+	 * Provides input fields for universal controls.
+	 * @param input Input data payload
+	 */
+	void handle_all_shape_controls_ui(Input& input);
+
+	/**
+	 * Renders current game state with raylib.
+	 * @param input Input data payload
+	 * @param font raylib font for entity nametags
+	 * @param font_asset Font asset for entity nametag size & color
+	 * @param entities Game entities
+	 */
+	void handle_rendering(const Input& input, const Font& font, const FontAsset& font_asset, const std::vector<Entity>& entities);
+
+	/**
+	 * Updates game physics simulation.
+	 * @param input Input data payload
+	 * @param window Containing window
+	 * @param entities Game entities
+	 */
+	void handle_simulation(const Input& input, const Window& window, std::vector<Entity>& entities);
+
+	/**
+	 * Provides input fields for selected entity.
+	 * @param input Input data payload
+	 * @param entities Game entities
+	 */
+	void handle_selected_shape_ui(Input& input, std::vector<Entity>& entities);
 
 	/**
 	 * Loads game configuration from the specified file path.
@@ -326,29 +373,11 @@ namespace a1 {
 	std::istream& read_rectangle_entity(std::istream& input, Entity& obj);
 
 	/**
-	 * Syncs input and game state.
-	 * @details Updates entity's components following user input. When a new entity
-	 *          is selected, the input fields are updated to reflect the new data.
+	 * Updates selected entity & corresponding input fields.
 	 * @param input Input data payload
-	 * @param previous_input Previous input data payload
-	 * @param entities Pointer to entity data
-	 * @param size Total number of entities
+	 * @param entities Game entities
 	 */
-	void handle_input(Input& input, const Input& previous_input, Entity* entities, std::size_t size);
-
-	/*
-	 * Provides input fields for universal controls.
-	 * @param input Input data payload
-	 */
-	void handle_all_shape_controls_ui(Input& input);
-
-	/**
-	 * Provides input fields for selected entity.
-	 * @param input Input data payload
-	 * @param entities Pointer to entity data
-	 * @param size Total number of entities
-	 */
-	void handle_selected_shape_ui(Input& input, Entity* entities, std::size_t size);
+	void update_selection(Input& input, const Input& previous_input, std::vector<Entity>& entities);
 }
 
 //------------------------------------------------------------------------------------
@@ -382,20 +411,13 @@ int main(void) {
 
 	// Main game loop
 	//--------------------------------------------------------------------------------------
-	while( !WindowShouldClose() )    // Detect window close button or ESC key
-	{
+	// Detect window close button or ESC key
+	while( !WindowShouldClose() ) {
 		// Update
 		//----------------------------------------------------------------------------------
-		handle_input(input, previous_input, entities.data(), entities.size());
+		handle_input(input, previous_input, entities);
 		previous_input = input;
-		for( auto& entity : entities ) {
-			if( !entity.is_active ) {
-				continue;
-			}
-			if( input.simulate_enabled ) {
-				move(entity, window);
-			}
-		}
+		handle_simulation(input, window, entities);
 
 		// Draw
 		//----------------------------------------------------------------------------------
@@ -404,28 +426,14 @@ int main(void) {
 		ClearBackground(BLACK);
 
 		//********** Raylib Drawing Content **********
-
-		for( const auto& entity : entities ) {
-			if( !entity.is_active ) {
-				continue;
-			}
-			if( input.draw_shapes_enabled ) {
-				draw_shape(entity);
-			}
-			if( input.draw_text_enabled ) {
-				draw_name(entity, font, font_asset.size, font_asset.color);
-			}
-		}
+		handle_rendering(input, font, font_asset, entities);
 
 		//********** ImGUI Content *********
-
 		rlImGuiBegin();
 		ImGui::SetNextWindowSize(ImVec2(400, 400));
 		ImGui::Begin("Assignment 1 Controls", NULL, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoCollapse);
-
 		handle_all_shape_controls_ui(input);
-		handle_selected_shape_ui(input, entities.data(), entities.size());
-
+		handle_selected_shape_ui(input, entities);
 		ImGui::End();
 		rlImGuiEnd();
 
@@ -474,7 +482,6 @@ namespace a1 {
 			min_y < 0 ? min_y : max_y > window.height ? max_y - window.height : 0
 		};
 	}
-
 
 	void Rectangle::draw(Position position, float scale, Color color) const {
 		DrawRectangle(
@@ -560,6 +567,18 @@ namespace a1 {
 		return input;
 	}
 
+	void change_selection(Input& input, const std::vector<Entity>& entities) {
+		const auto& entity = entities[input.selected_index];
+		input.is_active = entity.is_active;
+		input.scale = entity.scale;
+		input.velocity[0] = entity.velocity.x;
+		input.velocity[1] = entity.velocity.y;
+		input.color[0] = entity.color.r;
+		input.color[1] = entity.color.g;
+		input.color[2] = entity.color.b;
+		input.name = entity.name;
+	}
+
 	void draw_name(const Entity& entity, const Font& font, int size, Color color) {
 		const auto text_size = MeasureTextEx(font, entity.name.c_str(), size, 1.0f);
 		DrawTextEx(
@@ -585,49 +604,50 @@ namespace a1 {
 		ImGui::Checkbox("Simulate", &input.simulate_enabled);
 	}
 
-	void handle_input(Input& input, const Input& previous_input, Entity* entities, std::size_t size) {
-		const auto index = input.selected_index;
-		if( index >= size ) {
+	void handle_input(Input& input, const Input& previous_input, std::vector<Entity>& entities) {
+		if( input.selected_index >= entities.size() ) {
 			return;
 		}
-		auto& entity = entities[index];
-		if( previous_input.selected_index == index ) {
-			entity.is_active = input.is_active;
-			entity.scale = input.scale;
-			if( input.velocity[0] == previous_input.velocity[0] ) {
-				input.velocity[0] = entity.velocity.x;
-			}
-			else {
-				entity.velocity.x = input.velocity[0];
-			}
-			if( input.velocity[1] == previous_input.velocity[1] ) {
-				input.velocity[1] = entity.velocity.y;
-			}
-			else {
-				entity.velocity.y = input.velocity[1];
-			}
-			entity.color ={ input.color[0], input.color[1], input.color[2] };
-			entity.name = input.name;
+		if( input.selected_index == previous_input.selected_index ) {
+			update_selection(input, previous_input, entities);
 		}
 		else {
-			input.is_active = entity.is_active;
-			input.scale = entity.scale;
-			input.velocity[0] = entity.velocity.x;
-			input.velocity[1] = entity.velocity.y;
-			input.color[0] = entity.color.r;
-			input.color[1] = entity.color.g;
-			input.color[2] = entity.color.b;
-			input.name = entity.name;
+			change_selection(input, entities);
 		}
 	}
 
-	void handle_selected_shape_ui(Input& input, Entity* entities, std::size_t size) {
+	void handle_rendering(const Input& input, const Font& font, const FontAsset& font_asset, const std::vector<Entity>& entities) {
+		for( const auto& entity : entities ) {
+			if( !entity.is_active ) {
+				continue;
+			}
+			if( input.draw_shapes_enabled ) {
+				draw_shape(entity);
+			}
+			if( input.draw_text_enabled ) {
+				draw_name(entity, font, font_asset.size, font_asset.color);
+			}
+		}
+	}
+
+	void handle_simulation(const Input& input, const Window& window, std::vector<Entity>& entities) {
+		for( auto& entity : entities ) {
+			if( !entity.is_active ) {
+				continue;
+			}
+			if( input.simulate_enabled ) {
+				move(entity, window);
+			}
+		}
+	}
+
+	void handle_selected_shape_ui(Input& input, std::vector<Entity>& entities) {
 		ImGui::SeparatorText("Selected Shape Controls");
-		if( size == 0 ) {
+		if( entities.size() == 0 ) {
 			return;
 		}
 		if( ImGui::BeginCombo("Shape", entities[input.selected_index].name.c_str()) ) {
-			for( std::size_t i = 0; i < size; ++i ) {
+			for( std::size_t i = 0; i < entities.size(); ++i ) {
 				const bool is_selected = input.selected_index == i;
 				if( ImGui::Selectable(entities[i].name.c_str(), is_selected) ) {
 					input.selected_index = i;
@@ -698,5 +718,27 @@ namespace a1 {
 			entity.shape = std::make_unique<Rectangle>(width, height);
 		}
 		return input;
+	}
+
+	void update_selection(Input& input, const Input& previous_input, std::vector<Entity>& entities) {
+		auto& entity = entities[input.selected_index];
+		entity.is_active = input.is_active;
+		entity.scale = input.scale;
+		// Update entity velocity if the input changed, or else update the input field
+		// to show the current velocity
+		if( input.velocity[0] == previous_input.velocity[0] ) {
+			input.velocity[0] = entity.velocity.x;
+		}
+		else {
+			entity.velocity.x = input.velocity[0];
+		}
+		if( input.velocity[1] == previous_input.velocity[1] ) {
+			input.velocity[1] = entity.velocity.y;
+		}
+		else {
+			entity.velocity.y = input.velocity[1];
+		}
+		entity.color ={ input.color[0], input.color[1], input.color[2] };
+		entity.name = input.name;
 	}
 }
