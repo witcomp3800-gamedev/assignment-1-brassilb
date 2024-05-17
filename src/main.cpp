@@ -51,7 +51,7 @@ namespace a1 {
 	 */
 	struct FontAsset {
 		std::filesystem::path file;
-		int size = 12;
+		float size = 12;
 		Color color ={ 1.0f, 1.0f, 1.0f, 1.0f };
 	};
 
@@ -278,10 +278,10 @@ namespace a1 {
 	 * Draws an entity's name to the screen with raylib.
 	 * @param entity Entity object to draw
 	 * @param font raylib font data
-	 * @param size Text font size
+	 * @param font_size Text font size
 	 * @param color Text color
 	 */
-	void draw_name(const Entity& entity, const Font& font, int size, Color color);
+	void draw_name(const Entity& entity, const Font& font, float font_size, Color color);
 
 	/**
 	 * Draws an entity's shape to the screen with raylib.
@@ -579,13 +579,13 @@ namespace a1 {
 		input.name = entity.name;
 	}
 
-	void draw_name(const Entity& entity, const Font& font, int size, Color color) {
-		const auto text_size = MeasureTextEx(font, entity.name.c_str(), size, 1.0f);
+	void draw_name(const Entity& entity, const Font& font, float font_size, Color color) {
+		const auto text_size = MeasureTextEx(font, entity.name.c_str(), font_size, 1.0f);
 		DrawTextEx(
 			font,
 			entity.name.c_str(),
 			{ entity.position.x - text_size.x / 2, entity.position.y - text_size.y / 2 },
-			size,
+			font_size,
 			1.0f,
 			ColorFromNormalized({ color.r, color.g, color.b, color.a })
 		);
